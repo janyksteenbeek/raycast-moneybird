@@ -18,7 +18,6 @@ function Command() {
   const [customers, setCustomers] = useState<MoneybirdApiCustomer[]>([]);
   const [projects, setProjects] = useState<MoneybirdApiProject[]>([]);
   const [users, setUsers] = useState<MoneybirdUser[]>([]);
-  const [startTime, setStartTime] = useState<Date>(new Date());
 
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
@@ -28,7 +27,6 @@ function Command() {
       const storedTime = await LocalStorage.getItem<string>("startTime");
       if (storedTime) {
         const date = new Date(storedTime);
-        setStartTime(date);
         setStartDate(date);
       }
     }
@@ -43,7 +41,7 @@ function Command() {
       userId: "",
       startDate: new Date(),
       endDate: new Date(),
-        },
+    },
     validation: {
       description: (value) => {
         if (!value || value.length === 0) return "Description is required";
@@ -62,7 +60,7 @@ function Command() {
       try {
         const administrationId = await getAdministrationId();
         setIsLoading(true);
-        const timeEntry = await createTimeEntry(administrationId, {
+        await createTimeEntry(administrationId, {
           started_at: startDate.toISOString(),
           ended_at: endDate.toISOString(),
           project_id: values.projectId,
@@ -78,7 +76,7 @@ function Command() {
         setValue("userId", "");
         setValue("startDate", new Date());
         setValue("endDate", new Date());
-        
+
         // Clear the start time from storage after successful submission
         await LocalStorage.removeItem("startTime");
       } catch (error) {
@@ -96,7 +94,7 @@ function Command() {
         const [fetchedCustomers, fetchedProjects, fetchedUsers] = await Promise.all([
           getContacts(administrationId),
           getProjects(administrationId),
-          getUsers(administrationId)
+          getUsers(administrationId),
         ]);
 
         setCustomers(fetchedCustomers);
@@ -121,14 +119,10 @@ function Command() {
         </ActionPanel>
       }
     >
-      <Form.TextField 
-        title="Description" 
-        placeholder="Enter description" 
-        {...itemProps.description}
-      />
-      <Form.DatePicker 
+      <Form.TextField title="Description" placeholder="Enter description" {...itemProps.description} />
+      <Form.DatePicker
         id="startDate"
-        title="Start Date" 
+        title="Start Date"
         value={startDate}
         onChange={(date) => {
           if (date) {
@@ -137,9 +131,9 @@ function Command() {
           }
         }}
       />
-      <Form.DatePicker 
+      <Form.DatePicker
         id="endDate"
-        title="End Date" 
+        title="End Date"
         value={endDate}
         onChange={(date) => {
           if (date) {
@@ -149,43 +143,23 @@ function Command() {
         }}
       />
       <Form.Separator />
-      <Form.Dropdown 
-        title="Customer"
-        isLoading={isLoading}
-        {...itemProps.customerId}
-      >
+      <Form.Dropdown title="Customer" isLoading={isLoading} {...itemProps.customerId}>
         {customers.map((customer) => (
-          <Form.Dropdown.Item 
-            key={customer.id} 
-            value={customer.id} 
-            title={customer.company_name || `${customer.firstname} ${customer.lastname}`} 
+          <Form.Dropdown.Item
+            key={customer.id}
+            value={customer.id}
+            title={customer.company_name || `${customer.firstname} ${customer.lastname}`}
           />
         ))}
       </Form.Dropdown>
-      <Form.Dropdown 
-        title="Project"
-        isLoading={isLoading}
-        {...itemProps.projectId}
-      > 
+      <Form.Dropdown title="Project" isLoading={isLoading} {...itemProps.projectId}>
         {projects.map((project) => (
-          <Form.Dropdown.Item 
-            key={project.id} 
-            value={project.id} 
-            title={project.name} 
-          />
+          <Form.Dropdown.Item key={project.id} value={project.id} title={project.name} />
         ))}
       </Form.Dropdown>
-      <Form.Dropdown 
-        title="User"
-        isLoading={isLoading}
-        {...itemProps.userId}
-      >
+      <Form.Dropdown title="User" isLoading={isLoading} {...itemProps.userId}>
         {users.map((user) => (
-          <Form.Dropdown.Item 
-            key={user.id} 
-            value={user.id} 
-            title={user.name} 
-          />
+          <Form.Dropdown.Item key={user.id} value={user.id} title={user.name} />
         ))}
       </Form.Dropdown>
     </Form>
