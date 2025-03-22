@@ -24,7 +24,9 @@ const fetchData = async <T>(path: string, options?: RequestInit): Promise<T> => 
 
   const response = await fetch(`https://moneybird.com/api/v2/${path}`, {
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
     },
     ...options,
   });
