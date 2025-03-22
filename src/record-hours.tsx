@@ -1,6 +1,6 @@
-import { Form, ActionPanel, Action, showToast } from "@raycast/api";
+import { Form, ActionPanel, Action, showToast, LocalStorage } from "@raycast/api";
 import { useState, useEffect } from "react";
-import { useLocalStorage, withAccessToken, useForm } from "@raycast/utils";
+import { withAccessToken, useForm } from "@raycast/utils";
 import { getContacts, getAdministrationId, provider, getProjects, getUsers, createTimeEntry } from "./oauth/moneybird";
 import { MoneybirdApiProject, MoneybirdUser, MoneybirdApiCustomer } from "./types/moneybird";
 
@@ -11,8 +11,6 @@ interface FormValues {
   userId: string;
   startDate: Date;
   endDate: Date;
-  breakTime: string;
-  declarable: boolean;
 }
 
 function Command() {
@@ -20,22 +18,32 @@ function Command() {
   const [customers, setCustomers] = useState<MoneybirdApiCustomer[]>([]);
   const [projects, setProjects] = useState<MoneybirdApiProject[]>([]);
   const [users, setUsers] = useState<MoneybirdUser[]>([]);
-  const { value: startTime } = useLocalStorage("startTime", new Date());
+  const [startTime, setStartTime] = useState<Date>(new Date());
 
-  const [startDate, setStartDate] = useState<Date>(startTime || new Date());
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
 
-  const { handleSubmit, itemProps, values, setValue } = useForm<FormValues>({
+  useEffect(() => {
+    async function loadStartTime() {
+      const storedTime = await LocalStorage.getItem<string>("startTime");
+      if (storedTime) {
+        const date = new Date(storedTime);
+        setStartTime(date);
+        setStartDate(date);
+      }
+    }
+    loadStartTime();
+  }, []);
+
+  const { handleSubmit, itemProps, setValue } = useForm<FormValues>({
     initialValues: {
       description: "",
       customerId: "",
       projectId: "",
       userId: "",
-      startDate: startTime || new Date(),
+      startDate: new Date(),
       endDate: new Date(),
-      breakTime: "0",
-      declarable: false
-    },
+        },
     validation: {
       description: (value) => {
         if (!value || value.length === 0) return "Description is required";
@@ -51,14 +59,9 @@ function Command() {
       },
     },
     onSubmit: async (values) => {
-      console.log({
-        ...values,
-        startDate,
-        endDate,
-        breakTime: parseInt(values.breakTime, 10)
-      });
-      const administrationId = await getAdministrationId();
-      setIsLoading(true);
+      try {
+        const administrationId = await getAdministrationId();
+        setIsLoading(true);
         const timeEntry = await createTimeEntry(administrationId, {
           started_at: startDate.toISOString(),
           ended_at: endDate.toISOString(),
@@ -75,8 +78,14 @@ function Command() {
         setValue("userId", "");
         setValue("startDate", new Date());
         setValue("endDate", new Date());
-        setValue("breakTime", "0");
-      setIsLoading(false);
+        
+        // Clear the start time from storage after successful submission
+        await LocalStorage.removeItem("startTime");
+      } catch (error) {
+        showToast({ title: "Error", message: "Failed to create time entry: " + error });
+      } finally {
+        setIsLoading(false);
+      }
     },
   });
 
@@ -138,10 +147,6 @@ function Command() {
             setValue("endDate", date);
           }
         }}
-      />
-      <Form.Checkbox 
-        label="Declarable" 
-        {...itemProps.declarable}
       />
       <Form.Separator />
       <Form.Dropdown 
