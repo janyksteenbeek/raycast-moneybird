@@ -1,8 +1,10 @@
-import { Form, ActionPanel, Action, showToast, LocalStorage } from "@raycast/api";
+import { Form, ActionPanel, Action, showToast } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { withAccessToken, useForm } from "@raycast/utils";
-import { getContacts, getAdministrationId, provider, getProjects, getUsers, createTimeEntry } from "./oauth/moneybird";
+import { getContacts, getAdministrationId, getProjects, getUsers, createTimeEntry } from "./oauth/moneybird";
+import { provider } from "./oauth/client";
 import { MoneybirdApiProject, MoneybirdUser, MoneybirdApiCustomer } from "./types/moneybird";
+import { cacheKey, loadCachedList, saveCachedList } from "./lib/cache";
 
 interface FormValues {
   description: string;
@@ -18,6 +20,7 @@ function Command() {
   const [customers, setCustomers] = useState<MoneybirdApiCustomer[]>([]);
   const [projects, setProjects] = useState<MoneybirdApiProject[]>([]);
   const [users, setUsers] = useState<MoneybirdUser[]>([]);
+  const [administrationId, setAdministrationId] = useState<string | null>(null);
 
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
@@ -89,19 +92,46 @@ function Command() {
     },
   });
 
+  const resolveAdministrationId = async () => {
+    if (administrationId) return administrationId;
+    const resolvedId = await getAdministrationId();
+    setAdministrationId(resolvedId);
+    return resolvedId;
+  };
+
+  const hydrateFromCache = async (resolvedAdministrationId: string) => {
+    const [cachedCustomers, cachedProjects] = await Promise.all([
+      loadCachedList<MoneybirdApiCustomer>(cacheKey(resolvedAdministrationId, "contacts")),
+      loadCachedList<MoneybirdApiProject>(cacheKey(resolvedAdministrationId, "projects")),
+    ]);
+
+    if (cachedCustomers) setCustomers(cachedCustomers);
+    if (cachedProjects) setProjects(cachedProjects);
+    if (cachedCustomers || cachedProjects) setIsLoading(false);
+  };
+
+  const refreshAll = async (resolvedAdministrationId: string) => {
+    const [fetchedCustomers, fetchedProjects, fetchedUsers] = await Promise.all([
+      getContacts(resolvedAdministrationId),
+      getProjects(resolvedAdministrationId),
+      getUsers(resolvedAdministrationId),
+    ]);
+
+    setCustomers(fetchedCustomers);
+    setProjects(fetchedProjects);
+    setUsers(fetchedUsers);
+    await Promise.all([
+      saveCachedList(cacheKey(resolvedAdministrationId, "contacts"), fetchedCustomers),
+      saveCachedList(cacheKey(resolvedAdministrationId, "projects"), fetchedProjects),
+    ]);
+  };
+
   useEffect(() => {
     async function fetchData() {
       try {
-        const administrationId = await getAdministrationId();
-        const [fetchedCustomers, fetchedProjects, fetchedUsers] = await Promise.all([
-          getContacts(administrationId),
-          getProjects(administrationId),
-          getUsers(administrationId),
-        ]);
-
-        setCustomers(fetchedCustomers);
-        setProjects(fetchedProjects);
-        setUsers(fetchedUsers);
+        const resolvedAdministrationId = await resolveAdministrationId();
+        await hydrateFromCache(resolvedAdministrationId);
+        await refreshAll(resolvedAdministrationId);
       } catch (error) {
         showToast({ title: "Error", message: "Failed to load data:" + error });
       } finally {
@@ -112,12 +142,46 @@ function Command() {
     fetchData();
   }, []);
 
+  const refreshContacts = async () => {
+    try {
+      setIsLoading(true);
+      const resolvedAdministrationId = await resolveAdministrationId();
+      const refreshedCustomers = await getContacts(resolvedAdministrationId);
+      setCustomers(refreshedCustomers);
+      await saveCachedList(cacheKey(resolvedAdministrationId, "contacts"), refreshedCustomers);
+      showToast({ title: "Contacts refreshed" });
+    } catch (error) {
+      showToast({ title: "Error", message: "Failed to refresh contacts:" + error });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshProjects = async () => {
+    try {
+      setIsLoading(true);
+      const resolvedAdministrationId = await resolveAdministrationId();
+      const refreshedProjects = await getProjects(resolvedAdministrationId);
+      setProjects(refreshedProjects);
+      await saveCachedList(cacheKey(resolvedAdministrationId, "projects"), refreshedProjects);
+      showToast({ title: "Projects refreshed" });
+    } catch (error) {
+      showToast({ title: "Error", message: "Failed to refresh projects:" + error });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Form
       isLoading={isLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm onSubmit={handleSubmit} />
+          <ActionPanel.Section>
+            <Action title="Refresh Contacts" onAction={refreshContacts} />
+            <Action title="Refresh Projects" onAction={refreshProjects} />
+          </ActionPanel.Section>
         </ActionPanel>
       }
     >
