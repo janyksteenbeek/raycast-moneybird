@@ -5,4 +5,5 @@ Initial release
 
 ## v0.2.0
  - Implemented caching of contact and project lists
- - Now fetches all contacts and project lists by paginating through API
+ - Now fetches all contacts and project lists by paginating through API (fixes #24390)
+ - Added Repeat Time Entry option, that prefills the fields with your last time entry, but with today's date (fixes #23438)
