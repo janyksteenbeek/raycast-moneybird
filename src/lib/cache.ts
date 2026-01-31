@@ -17,7 +17,7 @@ const isCacheFresh = (updatedAt: string | undefined) => {
 export const cacheKey = (administrationId: string, key: "contacts" | "projects") =>
   `moneybird.${key}.${administrationId}`;
 
-export const loadCachedList = async <T,>(key: string) => {
+export const loadCachedList = async <T>(key: string) => {
   const cached = await LocalStorage.getItem<string>(key);
   if (!cached) return null;
   try {
@@ -30,7 +30,7 @@ export const loadCachedList = async <T,>(key: string) => {
   }
 };
 
-export const saveCachedList = async <T,>(key: string, items: T[]) => {
+export const saveCachedList = async <T>(key: string, items: T[]) => {
   const payload: CachedList<T> = { items, updatedAt: new Date().toISOString() };
   await LocalStorage.setItem(key, JSON.stringify(payload));
 };
